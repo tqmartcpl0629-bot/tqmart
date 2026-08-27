@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TQ mart 頂甲生鮮 - 線上點餐系統</title>
+  <style>
+    :root { --primary-color: #0b5d3b; --accent-color: #d9381e; --bg-color: #f4f6f8; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    body { background-color: var(--bg-color); color: #333; padding: 15px; max-width: 800px; margin: 0 auto; }
+    
+    header { background: var(--primary-color); color: white; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
+    header h1 { font-size: 1.5rem; margin-bottom: 5px; }
+    header p { font-size: 0.85rem; opacity: 0.9; }
+
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+    .card-title { font-size: 1.1rem; font-weight: bold; color: var(--primary-color); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+
+    .section-title { font-size: 1.15rem; font-weight: bold; color: var(--primary-color); margin: 20px 0 8px 0; border-left: 4px solid var(--primary-color); padding-left: 8px; }
+    .section-title:first-child { margin-top: 0; }
+
+    .time-notice { background: #fff3cd; color: #856404; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; margin-bottom: 12px; border-left: 4px solid #ffeeba; }
+
+    .menu-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+    .menu-info { flex: 1; }
+    .menu-name { font-weight: bold; font-size: 1rem; }
+    .menu-price { color: var(--accent-color); font-weight: bold; margin-top: 4px; }
+    .qty-control { display: flex; align-items: center; gap: 8px; }
+    .btn-qty { width: 32px; height: 32px; border: 1px solid #ccc; background: #fff; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
+    .btn-qty:disabled { opacity: .4; cursor: not-allowed; }
+    .soldout-badge { display:inline-block; margin-left:8px; padding:3px 8px; border-radius:12px; background:#f8d7da; color:#721c24; font-size:.72rem; font-weight:bold; }
+    .qty-display { font-weight: bold; width: 20px; text-align: center; }
+
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: #444; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .error-msg { color: var(--accent-color); font-size: 0.82rem; font-weight: bold; margin-top: 4px; display: none; }
+
+    .summary-box { background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95rem; }
+    .summary-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .summary-total { font-size: 1.2rem; font-weight: bold; color: var(--accent-color); border-top: 1px dashed #bbb; padding-top: 8px; margin-top: 8px; }
+
+    .btn-submit { width: 100%; background: var(--primary-color); color: white; border: none; padding: 14px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+    .btn-submit:hover { background: #08482d; }
+
+    .notice { font-size: 0.8rem; color: #666; margin-top: 4px; line-height: 1.3; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>TQ mart 頂甲生鮮 - 線上點餐機</h1>
+    <p>新鮮現做 ‧ 嚴選食材 ‧ 屏東廣東店</p>
+  </header>
+
+  <!-- 1. 選擇餐點 -->
+  <div class="card">
+    <div class="card-title">🍱 1. 選擇餐點</div>
+    
+    <div class="section-title">🥗 輕食餐盒</div>
+    <div class="time-notice" id="lightNotice"></div>
+    <div id="lightMenuContainer"></div>
+
+    <div class="section-title">🍗 美味熟食</div>
+    <div class="time-notice" id="cookedNotice"></div>
+    <div id="cookedMenuContainer"></div>
+  </div>
+
+  <!-- 2. 取餐與顧客資訊 -->
+  <div class="card">
+    <div class="card-title">📋 2. 訂購人與取餐資訊</div>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label>訂購人姓名 <span style="color:red;">*</span></label>
+        <input type="text" id="custName" placeholder="例如：陳小姐" required>
+      </div>
+      <div class="form-group">
+        <label>聯絡電話 (限10碼) <span style="color:red;">*</span></label>
+        <input type="tel" id="custPhone" placeholder="例如：0912345678" maxlength="10" pattern="[0-9]{10}" required oninput="validatePhone()">
+        <div class="error-msg" id="phoneError">⚠️ 請輸入有效的 10 位數手機號碼！</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>取餐方式 <span style="color:red;">*</span></label>
+      <select id="diningType" onchange="handleDiningTypeChange()">
+        <option value="pickup">店內自取</option>
+        <option value="delivery">外送服務（滿 10 份餐點才可外送，自動加購 $3 塑膠袋）</option>
+      </select>
+    </div>
+
+    <div class="form-group" id="addressGroup" style="display:none; background:#fff3cd; padding:12px; border-radius:8px; border:1px solid #ffeeba;">
+      <label style="color:#856404;">外送地址 <span style="color:red;">*</span></label>
+      <input type="text" id="deliveryAddress" placeholder="請輸入完整地址（包含路段、門牌、樓層）">
+      <div class="notice" style="color:#856404;">⚠️ 注意：外送服務僅限餐點總數達 10 份（含）以上之訂單。</div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>預計取餐/外送日期 <span style="color:red;">*</span></label>
+        <input type="date" id="pickupDate" required onchange="renderPickupTimeOptions(); validatePickupTime()">
+      </div>
+      <div class="form-group">
+        <label>預計取餐/外送時間 <span style="color:red;">*</span></label>
+        <select id="pickupTime" required onchange="validatePickupTime()"></select>
+        <div class="error-msg" id="timeError"></div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>發票統編 / 抬頭（若需報帳請填寫）</label>
+      <div class="form-row">
+        <input type="text" id="taxId" placeholder="統一編號（8碼數字）" maxlength="8">
+        <input type="text" id="taxTitle" placeholder="公司/抬頭全銜">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>備註事項</label>
+      <textarea id="notes" rows="2" placeholder="如有不加蔥、醬汁分開等需求請備註"></textarea>
+    </div>
+  </div>
+
+  <!-- 3. 結帳與送出 -->
+  <div class="card">
+    <div class="card-title">💰 3. 費用明細與結帳</div>
+    
+    <div class="summary-box">
+      <div class="summary-row">
+        <span>餐點總份數：</span>
+        <span id="summaryMealCount" style="font-weight:bold;">0 份</span>
+      </div>
+      <div class="summary-row">
+        <span>餐點小計：</span>
+        <span id="summarySubtotal">$0</span>
+      </div>
+      <div class="summary-row" id="bagFeeRow" style="display:none; color:var(--accent-color);">
+        <span>外送塑膠袋費：</span>
+        <span>+$3</span>
+      </div>
+      <div class="summary-total">
+        <span>結帳總金額：</span>
+        <span id="summaryTotal">$0</span>
+      </div>
+    </div>
+
+    <button class="btn-submit" onclick="submitOrder()">🚀 確認送出訂單</button>
+  </div>
+
+  <script>
+    // ===== Google Sheets 雲端同步設定 =====
+    // 部署 Apps Script 後，把 /exec 網址貼到這裡。
+    const GOOGLE_API_URL = 'https://script.google.com/macros/s/AKfycbwqauNRZqW_yOQ6-Gr9PZ1wki_OBWXEPW7Rvpr6EjaiszVCMz4Dd7pEK60PdhR7qi2zTw/exec';
+    let cloudReady = false;
+    let cloudLoading = false;
+
+    function cloudRequest(action, data = {}) {
+      return new Promise((resolve, reject) => {
+        if (!GOOGLE_API_URL || GOOGLE_API_URL.includes('請貼上')) return reject(new Error('尚未設定 Google Apps Script URL'));
+        const callback = 'tqcb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+        const script = document.createElement('script');
+        const cleanup = () => { try { delete window[callback]; script.remove(); } catch(e){} };
+        const timer = setTimeout(() => { cleanup(); reject(new Error('Google 雲端連線逾時')); }, 12000);
+        window[callback] = (result) => { clearTimeout(timer); cleanup(); result && result.ok === false ? reject(new Error(result.error || '雲端操作失敗')) : resolve(result); };
+        const params = new URLSearchParams({action, callback});
+        if (Object.keys(data).length) params.set('data', encodeURIComponent(JSON.stringify(data)));
+        script.src = GOOGLE_API_URL + (GOOGLE_API_URL.includes('?') ? '&' : '?') + params.toString();
+        script.onerror = () => { clearTimeout(timer); cleanup(); reject(new Error('無法連線 Google 雲端')); };
+        document.head.appendChild(script);
+      });
+    }
+
+    async function loadCloudData() {
+      if (cloudLoading) return;
+      cloudLoading = true;
+      try {
+        const data = await cloudRequest('getData');
+        if (data.menuConfig && data.menuConfig.light && data.menuConfig.cooked) {
+          menuConfig = data.menuConfig;
+          localStorage.setItem('tq_menu_config', JSON.stringify(menuConfig));
+        }
+        if (Array.isArray(data.orders)) localStorage.setItem('tq_orders', JSON.stringify(data.orders));
+        if (Array.isArray(data.trash)) localStorage.setItem('tq_trash', JSON.stringify(data.trash));
+        cloudReady = true;
+        initPage();
+      } catch (e) {
+        console.warn('Google 雲端尚未連線，使用本機資料：', e.message);
+        initPage();
+      } finally { cloudLoading = false; }
+    }
+
+    const defaultMenuConfig = {
+      light: {
+        title: "輕食餐盒",
+        notice: "⏰ 限定中午時段 (11:00-14:00) 供餐，最晚須於取餐前 2 小時預訂！",
+        startHour: 11, endHour: 14,
+        items: [
+          { id: 'l1', name: '蔥鹽雞腿飯', price: 90 },
+          { id: 'l2', name: '照燒雞腿飯', price: 90 },
+          { id: 'l3', name: '黑胡椒雞柳飯', price: 90 },
+          { id: 'l4', name: '炒鮮菇雞柳飯', price: 90 },
+          { id: 'l5', name: '舒肥雞胸飯(口味隨機)', price: 90 },
+          { id: 'l6', name: '親子丼', price: 90 },
+          { id: 'l7_1', name: '黃金雞腿飯', price: 90 },
+          { id: 'l7_2', name: '塔香雞腿飯', price: 90 },
+          { id: 'l8', name: '蒜燒里肌飯', price: 90 },
+          { id: 'l9', name: '黑胡椒鐵板麵', price: 65 },
+          { id: 'l10', name: '蘑菇鐵板麵', price: 65 }
+        ]
+      },
+      cooked: {
+        title: "美味熟食",
+        notice: "⏰ 限定下午/傍晚時段 (15:00-18:00) 供餐，最晚須於取餐前 2 小時預訂！",
+        startHour: 15, endHour: 18,
+        items: [
+          { id: 'c1', name: '烤全雞', price: 249 },
+          { id: 'c2', name: '蜜汁雞腿', price: 80 },
+          { id: 'c3', name: '紐澳良烤雞翅(5支)', price: 150 },
+          { id: 'c4', name: '德國豬腳', price: 359 },
+          { id: 'c5', name: '秘製炭烤小排', price: 299 },
+          { id: 'c6', name: '秘製梅花叉燒', price: 299 }
+        ]
+      }
+    };
+
+    let menuConfig = JSON.parse(localStorage.getItem('tq_menu_config')) || defaultMenuConfig;
+    let cart = {};
+
+    function normalizeMenuConfig() {
+      ['light','cooked'].forEach(cat => {
+        if (!menuConfig[cat]) return;
+        menuConfig[cat].items.forEach(item => { item.soldOut = item.soldOut === true; });
+      });
+    }
+
+    function getAvailableTimeSlots() {
+      const slots = [];
+      const hasLight = Object.keys(cart).some(id => menuConfig.light.items.some(i => i.id === id));
+      const hasCooked = Object.keys(cart).some(id => menuConfig.cooked.items.some(i => i.id === id));
+      const categories = hasLight && !hasCooked ? [menuConfig.light] :
+                         hasCooked && !hasLight ? [menuConfig.cooked] : [];
+      const ranges = categories.length ? categories.map(c => [c.startHour, c.endHour]) : [[11,14],[15,18]];
+      const today = new Date().toISOString().split('T')[0];
+      const selectedDate = document.getElementById('pickupDate')?.value;
+      const now = new Date();
+
+      ranges.forEach(([startHour,endHour]) => {
+        for (let hour=startHour; hour<endHour; hour++) {
+          [0,30].forEach(minute => {
+            const value = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+            if (selectedDate === today) {
+              const dt = new Date(`${selectedDate}T${value}`);
+              if ((dt-now)/3600000 < 2) return;
+            }
+            slots.push(value);
+          });
+        }
+      });
+      return [...new Set(slots)].sort();
+    }
+
+    function renderPickupTimeOptions(preferredValue='') {
+      const select = document.getElementById('pickupTime');
+      const previous = preferredValue || select.value;
+      const slots = getAvailableTimeSlots();
+      select.innerHTML = '<option value="">請選擇可提供的時段</option>' +
+        slots.map(t => `<option value="${t}">${t}</option>`).join('');
+      if (slots.includes(previous)) select.value = previous;
+      if (!slots.length) {
+        select.innerHTML = '<option value="">目前沒有可用時段</option>';
+        select.value = '';
+      }
+      const hasLight = Object.keys(cart).some(id => menuConfig.light.items.some(i => i.id === id));
+      const hasCooked = Object.keys(cart).some(id => menuConfig.cooked.items.some(i => i.id === id));
+      const timeError = document.getElementById('timeError');
+      if (hasLight && hasCooked) {
+        timeError.innerText = '⚠️ 輕食與熟食供餐時段不同，請分開下單。';
+        timeError.style.display = 'block';
+      } else if (!slots.length && document.getElementById('pickupDate').value) {
+        timeError.innerText = '⚠️ 此日期已沒有符合提前 2 小時規定的可訂時段，請更換日期。';
+        timeError.style.display = 'block';
+      } else {
+        timeError.style.display = 'none';
+      }
+    }
+
+    function initPage() {
+      menuConfig = JSON.parse(localStorage.getItem('tq_menu_config')) || defaultMenuConfig;
+      normalizeMenuConfig();
+      document.getElementById('lightNotice').innerText = menuConfig.light.notice;
+      document.getElementById('cookedNotice').innerText = menuConfig.cooked.notice;
+
+      renderCategoryMenu('light', 'lightMenuContainer');
+      renderCategoryMenu('cooked', 'cookedMenuContainer');
+      document.getElementById('pickupDate').value = new Date().toISOString().split('T')[0];
+      refreshPickupTimeOptions();
+      renderPickupTimeOptions();
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'tq_menu_config') {
+          menuConfig = JSON.parse(e.newValue || JSON.stringify(defaultMenuConfig));
+          normalizeMenuConfig();
+          document.getElementById('lightNotice').innerText = menuConfig.light.notice;
+          document.getElementById('cookedNotice').innerText = menuConfig.cooked.notice;
+          renderCategoryMenu('light', 'lightMenuContainer');
+          renderCategoryMenu('cooked', 'cookedMenuContainer');
+          renderPickupTimeOptions();
+          updateSummary();
+        }
+        if (e.key === 'tq_orders') { /* 訂單資料同步保留 */ }
+      });
+    }
+
+    function renderCategoryMenu(cat, containerId) {
+      const container = document.getElementById(containerId);
+      const items = menuConfig[cat].items;
+
+      container.innerHTML = items.map(item => `
+        <div class="menu-item" style="${item.soldOut ? 'opacity:.58;' : ''}">
+          <div class="menu-info">
+            <div class="menu-name">${item.name}${item.soldOut ? '<span class="soldout-badge">售完</span>' : ''}</div>
+            <div class="menu-price">$${item.price}</div>
+          </div>
+          <div class="qty-control">
+            <button class="btn-qty" ${item.soldOut ? 'disabled' : ''} onclick="updateQty('${item.id}', -1)">-</button>
+            <span class="qty-display" id="qty-${item.id}">${cart[item.id] || 0}</span>
+            <button class="btn-qty" ${item.soldOut ? 'disabled' : ''} onclick="updateQty('${item.id}', 1)">+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateQty(itemId, change) {
+      const allItems = [...menuConfig.light.items, ...menuConfig.cooked.items];
+      const target = allItems.find(i => i.id === itemId);
+      if (target && target.soldOut) return;
+      const current = cart[itemId] || 0;
+      const updated = Math.max(0, current + change);
+      if (updated === 0) {
+        delete cart[itemId];
+      } else {
+        cart[itemId] = updated;
+      }
+      const el = document.getElementById(`qty-${itemId}`);
+      if (el) el.innerText = updated;
+      updateSummary();
+      renderPickupTimeOptions();
+      validatePickupTime(); // 選擇餐點改變時同步驗證時間
+    }
+
+    function validatePhone() {
+      const phoneInput = document.getElementById('custPhone');
+      const phoneError = document.getElementById('phoneError');
+      phoneInput.value = phoneInput.value.replace(/\D/g, ''); // 僅允許數字
+
+      if (phoneInput.value.length > 0 && phoneInput.value.length !== 10) {
+        phoneError.style.display = 'block';
+        return false;
+      } else {
+        phoneError.style.display = 'none';
+        return true;
+      }
+    }
+
+    function refreshPickupTimeOptions() {
+      const date = document.getElementById('pickupDate').value;
+      const select = document.getElementById('pickupTime');
+      if (!date) return;
+      const previous = select.value;
+      const now = new Date();
+      const slots = [];
+      const hasLight = Object.keys(cart).some(id => menuConfig.light.items.some(i=>i.id===id));
+      const hasCooked = Object.keys(cart).some(id => menuConfig.cooked.items.some(i=>i.id===id));
+      if (hasLight && hasCooked) {
+        select.innerHTML = '<option value="">⚠️ 輕食與熟食供應時段不同，請分開下單</option>';
+        return;
+      }
+      let start = hasCooked ? menuConfig.cooked.startHour : menuConfig.light.startHour;
+      let end = hasCooked ? menuConfig.cooked.endHour : menuConfig.light.endHour;
+      if (!hasLight && !hasCooked) { start=11; end=18; }
+      for (let h=start; h<end; h++) {
+        for (let m=0; m<60; m+=30) {
+          const hh=String(h).padStart(2,'0'), mm=String(m).padStart(2,'0');
+          const value=`${hh}:${mm}`;
+          const dt=new Date(`${date}T${value}`);
+          if ((dt-now)/3600000 >= 2) slots.push(value);
+        }
+      }
+      select.innerHTML = '<option value="">請選擇可取餐時間</option>' + slots.map(v=>`<option value="${v}">${v}</option>`).join('');
+      if (slots.includes(previous)) select.value=previous;
+    }
+
+    function validatePickupTime() {
+      const pickupDate = document.getElementById('pickupDate').value;
+      const pickupTime = document.getElementById('pickupTime').value;
+      const timeError = document.getElementById('timeError');
+      renderPickupTimeOptions(pickupTime);
+
+      if (!pickupDate || !pickupTime) return false;
+
+      const pickupDateTime = new Date(`${pickupDate}T${pickupTime}`);
+      const now = new Date();
+      if ((pickupDateTime - now) / 3600000 < 2) {
+        timeError.innerText = '⚠️ 訂餐需於取餐前至少 2 小時預訂！';
+        timeError.style.display = 'block';
+        return false;
+      }
+
+      const pickupHour = pickupDateTime.getHours();
+      let hasLight = false, hasCooked = false;
+      for (let id in cart) {
+        if (menuConfig.light.items.some(i => i.id === id)) hasLight = true;
+        if (menuConfig.cooked.items.some(i => i.id === id)) hasCooked = true;
+      }
+
+      if (hasLight && hasCooked) {
+        timeError.innerText = '⚠️ 輕食與熟食供餐時段不同，請分開下單。';
+        timeError.style.display = 'block';
+        return false;
+      }
+      if (hasLight && (pickupHour < menuConfig.light.startHour || pickupHour >= menuConfig.light.endHour)) return false;
+      if (hasCooked && (pickupHour < menuConfig.cooked.startHour || pickupHour >= menuConfig.cooked.endHour)) return false;
+
+      timeError.style.display = 'none';
+      return true;
+    }
+
+    function getTotalMealCount() {
+      return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+    }
+
+    function handleDiningTypeChange() {
+      const diningType = document.getElementById('diningType').value;
+      document.getElementById('addressGroup').style.display = (diningType === 'delivery') ? 'block' : 'none';
+      updateSummary();
+    }
+
+    function updateSummary() {
+      const mealCount = getTotalMealCount();
+      let subtotal = 0;
+
+      const allItems = [...menuConfig.light.items, ...menuConfig.cooked.items];
+      for (let id in cart) {
+        const item = allItems.find(m => m.id === id);
+        if (item) subtotal += item.price * cart[id];
+      }
+
+      const diningType = document.getElementById('diningType').value;
+      const bagFee = (diningType === 'delivery') ? 3 : 0;
+
+      document.getElementById('summaryMealCount').innerText = `${mealCount} 份`;
+      document.getElementById('summarySubtotal').innerText = `$${subtotal}`;
+      document.getElementById('bagFeeRow').style.display = bagFee > 0 ? 'flex' : 'none';
+      document.getElementById('summaryTotal').innerText = `$${subtotal + bagFee}`;
+    }
+
+    function submitOrder() {
+      const name = document.getElementById('custName').value.trim();
+      const phone = document.getElementById('custPhone').value.trim();
+      const diningType = document.getElementById('diningType').value;
+      const address = document.getElementById('deliveryAddress').value.trim();
+      const pickupDate = document.getElementById('pickupDate').value;
+      const pickupTime = document.getElementById('pickupTime').value;
+      const taxId = document.getElementById('taxId').value.trim();
+      const taxTitle = document.getElementById('taxTitle').value.trim();
+      const notes = document.getElementById('notes').value.trim();
+
+      const totalMeals = getTotalMealCount();
+
+      if (totalMeals === 0) return alert('⚠️ 請至少選擇一份餐點！');
+      if (!name || !phone || !pickupDate || !pickupTime) return alert('⚠️ 請完整填寫姓名、電話與預計取餐時間！');
+
+      if (phone.length !== 10) {
+        return alert('⚠️ 聯絡電話格式不正確，必須為 10 位數手機號碼（例如：0912345678）！');
+      }
+
+      if (!validatePickupTime()) {
+        return alert('⚠️ 請選擇符合規範的預計取餐時間！');
+      }
+
+      if (diningType === 'delivery') {
+        if (totalMeals < 10) return alert(`⚠️ 外送服務須滿 10 份餐點才可送達！（目前僅選擇 ${totalMeals} 份）`);
+        if (!address) return alert('⚠️ 請輸入完整之外送地址！');
+      }
+
+      if (taxId && !/^\d{8}$/.test(taxId)) return alert('⚠️ 統一編號格式不正確，請輸入 8 位數數字！');
+
+      let itemDetails = [];
+      let subtotal = 0;
+      const allItems = [...menuConfig.light.items, ...menuConfig.cooked.items];
+
+      for (let id in cart) {
+        const item = allItems.find(m => m.id === id);
+        if (item) {
+          itemDetails.push(`${item.name} x ${cart[id]}`);
+          subtotal += item.price * cart[id];
+        }
+      }
+
+      let bagFee = (diningType === 'delivery') ? 3 : 0;
+      if (bagFee > 0) itemDetails.push(`外送加購塑膠袋 x 1 ($3)`);
+
+      const newOrder = {
+        id: 'TQ' + Date.now().toString().slice(-6),
+        name, phone,
+        diningType: diningType === 'delivery' ? '外送' : '自取',
+        address: diningType === 'delivery' ? address : '門市自取',
+        pickupDate, pickupTime,
+        taxId: taxId || '無', taxTitle: taxTitle || '無',
+        items: itemDetails.join('\n'),
+        total: subtotal + bagFee,
+        notes, status: '待處理',
+        createdAt: new Date().toISOString()
+      };
+
+      let existingOrders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      existingOrders.unshift(newOrder);
+      localStorage.setItem('tq_orders', JSON.stringify(existingOrders));
+      if (cloudReady) cloudRequest('createOrder', newOrder).catch(e => alert('⚠️ 雲端同步失敗：' + e.message));
+
+      alert(`🎉 訂單送出成功！\n單號：${newOrder.id}\n預計${newOrder.diningType}時間：${pickupDate} ${pickupTime}`);
+      
+      cart = {};
+      document.getElementById('notes').value = '';
+      document.getElementById('deliveryAddress').value = '';
+      document.getElementById('taxId').value = '';
+      document.getElementById('taxTitle').value = '';
+      renderCategoryMenu('light', 'lightMenuContainer');
+      renderCategoryMenu('cooked', 'cookedMenuContainer');
+      renderPickupTimeOptions();
+      updateSummary();
+    }
+
+    initPage();
+    loadCloudData();
+    setInterval(loadCloudData, 5000);
+  </script>
+</body>
+</html>
