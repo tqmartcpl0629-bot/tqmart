@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TQ mart 頂甲生鮮 - 後台訂單管理系統</title>
+  <style>
+    :root { --primary-color: #0b5d3b; --accent-color: #d9381e; --bg-color: #f4f6f8; --warning-color: #f59e0b; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    body { background-color: var(--bg-color); color: #333; padding: 20px; max-width: 1200px; margin: 0 auto; }
+
+    header { background: var(--primary-color); color: white; padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    header p { font-size: 0.85rem; opacity: 0.9; }
+
+    /* 通知鈴鐺樣式 */
+    .header-right { display: flex; align-items: center; gap: 15px; position: relative; }
+    .bell-container { position: relative; cursor: pointer; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .bell-container:hover { background: rgba(255,255,255,0.3); }
+    .bell-icon { font-size: 1.2rem; }
+    .notification-badge { position: absolute; top: -2px; right: -2px; background: var(--accent-color); color: white; font-size: 0.7rem; font-weight: bold; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; display: none; }
+    
+    /* 通知彈出下拉選單 */
+    .notification-dropdown { position: absolute; right: 0; top: 50px; width: 320px; background: white; color: #333; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; z-index: 1000; overflow: hidden; border: 1px solid #ddd; }
+    .notification-header { background: #f8f9fa; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+    .notification-list { max-height: 280px; overflow-y: auto; }
+    .notification-item { padding: 10px 15px; border-bottom: 1px solid #f1f1f1; font-size: 0.85rem; cursor: pointer; transition: background 0.1s; }
+    .notification-item:hover { background: #fdfdfd; }
+    .notification-item.unread { background: #e8f5e9; font-weight: bold; }
+    .notification-time { font-size: 0.75rem; color: #777; margin-top: 3px; }
+
+    /* 統計卡片 */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .stat-card { background: white; padding: 18px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 5px solid var(--primary-color); }
+    .stat-card.accent { border-left-color: var(--accent-color); }
+    .stat-card.warning { border-left-color: var(--warning-color); }
+    .stat-title { font-size: 0.85rem; color: #666; margin-bottom: 6px; font-weight: bold; }
+    .stat-value { font-size: 1.5rem; font-weight: bold; color: #222; }
+
+    /* 控制面板與頁籤 */
+    .control-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .tabs-container { display: flex; gap: 10px; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+    .tab-btn { padding: 10px 18px; border: none; background: #e9ecef; color: #495057; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+    .tab-btn.active { background: var(--primary-color); color: white; box-shadow: 0 2px 6px rgba(11, 93, 59, 0.3); }
+    .tab-badge { background: var(--accent-color); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.75rem; }
+    .tab-btn.active .tab-badge { background: white; color: var(--accent-color); }
+
+    /* 工具列與篩選 */
+    .filter-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; }
+    .search-input { flex: 1; min-width: 200px; }
+
+    /* 訂單表格 */
+    .table-container { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+    th { background: #f8f9fa; color: #444; padding: 14px 12px; font-weight: bold; border-bottom: 2px solid #dee2e6; }
+    td { padding: 14px 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    tr:hover { background: #fbfbfb; }
+
+    /* 狀態標籤 */
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
+    .badge-pending { background: #fff3cd; color: #856404; }
+    .badge-completed { background: #d4edda; color: #155724; }
+    .badge-trash { background: #f8d7da; color: #721c24; }
+
+    /* 按鈕樣式 */
+    .btn { padding: 6px 12px; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; display: inline-flex; align-items: center; gap: 4px; }
+    .btn:hover { opacity: 0.85; }
+    .btn-complete { background: #28a745; color: white; }
+    .btn-edit { background: #17a2b8; color: white; }
+    .btn-delete { background: #dc3545; color: white; }
+    .btn-restore { background: #ffc107; color: #333; }
+    .btn-primary { background: var(--primary-color); color: white; }
+
+    /* 日曆與回收站檢視區 */
+    .section-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; display: none; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 15px; }
+    .calendar-header-cell { text-align: center; font-weight: bold; color: #666; padding: 8px; font-size: 0.85rem; }
+    .calendar-cell { background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px; min-height: 90px; padding: 8px; position: relative; font-size: 0.85rem; }
+    .calendar-cell.has-orders { background: #fff; border-color: var(--primary-color); }
+    .calendar-date-num { font-weight: bold; margin-bottom: 4px; color: #333; }
+    .dot-container { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #28a745; }
+    .dot-red { background: var(--accent-color); }
+
+    /* 彈跳視窗 Modal */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+    .modal-content { background: white; width: 90%; max-width: 550px; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+    .modal-title { font-size: 1.2rem; font-weight: bold; color: var(--primary-color); margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 8px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 0.85rem; color: #444; }
+    .form-group input, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+    .sync-status { font-size: 0.75rem; color: #a5d6a7; display: flex; align-items: center; gap: 5px; }
+    .sync-dot { width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 1.5px infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+
+    /* 新版後台三欄工作台 */
+    .dashboard-layout { display:grid; grid-template-columns:260px minmax(0,1fr); gap:18px; align-items:start; }
+    .sidebar { display:flex; flex-direction:column; gap:14px; }
+    .side-card { background:#fff; border-radius:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+    .side-card h3 { color:var(--primary-color); font-size:1rem; margin-bottom:12px; }
+    .side-stat { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #eee; }
+    .side-stat:last-child { border-bottom:0; }
+    .side-stat strong { font-size:1.15rem; }
+    .revenue-range { display:grid; gap:8px; }
+    .revenue-range input { width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; }
+    .revenue-result { margin-top:10px; padding:10px; background:#e8f5e9; border-radius:8px; font-weight:bold; color:var(--accent-color); text-align:center; }
+    .mini-calendar { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; font-size:.7rem; }
+    .mini-calendar .day { padding:5px 2px; text-align:center; border-radius:5px; min-height:28px; }
+    .mini-calendar .has-order { background:#e8f5e9; font-weight:bold; }
+    .mini-calendar .has-pending { outline:2px solid #f59e0b; }
+    .product-toggle { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #eee; font-size:.82rem; }
+    .product-toggle:last-child { border-bottom:0; }
+    .sold-switch { position:relative; width:42px; height:22px; flex:none; }
+    .sold-switch input { opacity:0; width:0; height:0; }
+    .sold-slider { position:absolute; inset:0; background:#28a745; border-radius:20px; cursor:pointer; transition:.2s; }
+    .sold-slider:before { content:""; position:absolute; width:18px; height:18px; left:2px; top:2px; background:white; border-radius:50%; transition:.2s; }
+    .sold-switch input:checked + .sold-slider { background:#dc3545; }
+    .sold-switch input:checked + .sold-slider:before { transform:translateX(20px); }
+    .main-orders { min-width:0; }
+    @media(max-width:900px){ .dashboard-layout{grid-template-columns:1fr;} .sidebar{order:2;} .main-orders{order:1;} }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>TQ mart 頂甲生鮮 - 後台管理系統</h1>
+      <p>即時監控 ‧ 訂單管理 ‧ 自動同步 Google 雲端試算表</p>
+    </div>
+    <div class="header-right">
+      <div class="sync-status">
+        <div class="sync-dot"></div> Google 雲端試算表已同步
+      </div>
+      <!-- 右上角通知鈴鐺 -->
+      <div class="bell-container" onclick="toggleNotificationDropdown()">
+        <span class="bell-icon">🔔</span>
+        <div class="notification-badge" id="notifBadge">0</div>
+        
+        <!-- 下拉通知選單 -->
+        <div class="notification-dropdown" id="notifDropdown" onclick="event.stopPropagation()">
+          <div class="notification-header">
+            <span>即時系統通知</span>
+            <button class="btn" style="font-size:0.75rem; padding:2px 6px;" onclick="markAllNotificationsRead()">全部已讀</button>
+          </div>
+          <div class="notification-list" id="notifList">
+            <div style="padding: 15px; text-align: center; color: #777; font-size: 0.85rem;">目前沒有新通知</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 後台工作台：左側摘要／營收／日曆／售完管理，中間訂單 -->
+  <div class="dashboard-layout">
+    <aside class="sidebar">
+      <div class="side-card">
+        <h3>📌 訂單即時狀態</h3>
+        <div class="side-stat"><span>今日待處理</span><strong id="statTodayPending">0</strong></div>
+        <div class="side-stat"><span>今日已完成</span><strong id="statTodayCompleted">0</strong></div>
+        <div class="side-stat"><span>所有待處理</span><strong id="sideAllPending">0</strong></div>
+        <div class="side-stat"><span>系統總訂單</span><strong id="statTotalOrders">0</strong></div>
+      </div>
+
+      <div class="side-card">
+        <h3>💰 自訂區間營收</h3>
+        <div class="revenue-range">
+          <input type="date" id="revStartDate" onchange="updateRevenue()">
+          <input type="date" id="revEndDate" onchange="updateRevenue()">
+        </div>
+        <div class="revenue-result" id="statRevenue">$0</div>
+      </div>
+
+      <div class="side-card">
+        <h3>📅 訂單日曆</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <button class="btn btn-primary" onclick="changeMonth(-1)">◀</button>
+          <strong id="miniCalendarTitle"></strong>
+          <button class="btn btn-primary" onclick="changeMonth(1)">▶</button>
+        </div>
+        <div class="mini-calendar" id="miniCalendar"></div>
+        <div style="font-size:.72rem;color:#666;margin-top:8px;">點選日期可查看該日訂單</div>
+      </div>
+
+      <div class="side-card">
+        <h3>🍱 商品供應狀態</h3>
+        <div style="font-size:.72rem;color:#777;margin-bottom:8px;">開啟「售完」後，前台會立即停止下單。</div>
+        <div id="productAvailability"></div>
+      </div>
+    </aside>
+
+    <main class="main-orders">
+      <div class="stats-grid" style="margin-bottom:14px;">
+        <div class="stat-card warning"><div class="stat-title">💰 區間營收</div><div class="stat-value" id="statRevenueTop">$0</div></div>
+        <div class="stat-card"><div class="stat-title">🔥 待處理</div><div class="stat-value" id="statPendingTop">0 筆</div></div>
+        <div class="stat-card accent"><div class="stat-title">✅ 已完成</div><div class="stat-value" id="statCompletedTop">0 筆</div></div>
+      </div>
+
+  <!-- 控制與頁籤面板 -->
+  <div class="control-panel">
+    <div class="tabs-container">
+      <button class="tab-btn active" onclick="switchTab('todayPending')">
+        🔥 今日待執行 <span class="tab-badge" id="badgeTodayPending">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('allPending')">
+        ⏳ 所有待處理 <span class="tab-badge" id="badgeAllPending">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('completed')">
+        📦 已完成 / 封存 <span class="tab-badge" id="badgeCompleted">0</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('calendar')">
+        📅 訂單日曆表
+      </button>
+      <button class="tab-btn" onclick="switchTab('trash')">
+        🗑️ 垃圾桶回收站 <span class="tab-badge" id="badgeTrash">0</span>
+      </button>
+    </div>
+
+    <!-- 篩選工具列 -->
+    <div class="filter-bar" id="filterBar">
+      <input type="text" id="searchInput" class="search-input" placeholder="搜尋訂購人姓名、電話或訂單編號..." oninput="renderOrders()">
+      
+      <!-- 封存專屬日期選擇器 -->
+      <div id="archiveDateFilterContainer" style="display:none; align-items:center; gap:6px;">
+        <span style="font-size:0.85rem; font-weight:bold; color:#555;">歷史日期篩選：</span>
+        <input type="date" id="archiveDateFilter" onchange="renderOrders()">
+        <button class="btn" style="background:#6c757d; color:white;" onclick="clearArchiveDateFilter()">清除日期</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 訂單表格檢視區 -->
+  <div class="table-container" id="orderTableContainer">
+    <table>
+      <thead>
+        <tr>
+          <th>訂單編號</th>
+          <th>訂購人 / 電話</th>
+          <th>取餐型態 / 內容</th>
+          <th>預計取餐時間</th>
+          <th>總金額</th>
+          <th>狀態</th>
+          <th>操作管理</th>
+        </tr>
+      </thead>
+      <tbody id="orderTableBody">
+        <!-- 動態渲染 -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 訂單日曆表檢視區 -->
+  <div class="section-box" id="calendarSection">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h3 style="color:var(--primary-color);" id="calendarTitle">2026年 8月 訂單日曆表</h3>
+      <div>
+        <button class="btn btn-primary" onclick="changeMonth(-1)">◀ 上個月</button>
+        <button class="btn btn-primary" onclick="changeMonth(1)">下個月 ▶</button>
+      </div>
+    </div>
+    <div class="calendar-grid">
+      <div class="calendar-header-cell">週日</div>
+      <div class="calendar-header-cell">週一</div>
+      <div class="calendar-header-cell">週二</div>
+      <div class="calendar-header-cell">週三</div>
+      <div class="calendar-header-cell">週四</div>
+      <div class="calendar-header-cell">週五</div>
+      <div class="calendar-header-cell">週六</div>
+    </div>
+    <div class="calendar-grid" id="calendarDaysGrid">
+      <!-- 日曆格子動態渲染 -->
+    </div>
+    <div style="margin-top:15px; display:flex; gap:15px; font-size:0.85rem; align-items:center;">
+      <span>圖示說明：</span>
+      <span style="display:flex; align-items:center; gap:4px;"><span class="dot dot-red"></span> 有待處理訂單</span>
+      <span style="display:flex; align-items:center; gap:4px;"><span class="dot dot-green"></span> 有已完成訂單</span>
+    </div>
+  </div>
+
+    </main>
+  </div>
+
+  <!-- 手動修改訂單 Modal -->
+  <div class="modal" id="editModal">
+    <div class="modal-content">
+      <div class="modal-title">✏️ 編輯訂單資訊</div>
+      <input type="hidden" id="editOrderId">
+      <div class="form-group">
+        <label>顧客姓名</label>
+        <input type="text" id="editName">
+      </div>
+      <div class="form-group">
+        <label>聯絡電話 (限10碼)</label>
+        <input type="tel" id="editPhone" maxlength="10">
+      </div>
+      <div class="form-row" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div class="form-group">
+          <label>取餐日期</label>
+          <input type="date" id="editDate">
+        </div>
+        <div class="form-group">
+          <label>取餐時間</label>
+          <input type="time" id="editTime">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>餐點內容與明細</label>
+        <textarea id="editContent" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label>總金額 ($)</label>
+        <input type="number" id="editTotal">
+      </div>
+      <div class="form-group">
+        <label>備註事項</label>
+        <textarea id="editNotes" rows="2"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" style="background:#6c757d; color:white;" onclick="closeEditModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveEditedOrder()">儲存變更</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Google Sheets 雲端同步設定 =====
+    // 部署 Apps Script 後，把 /exec 網址貼到這裡。
+    const GOOGLE_API_URL = 'https://script.google.com/macros/s/AKfycbwqauNRZqW_yOQ6-Gr9PZ1wki_OBWXEPW7Rvpr6EjaiszVCMz4Dd7pEK60PdhR7qi2zTw/exec';
+    let cloudReady = false;
+    let cloudLoading = false;
+
+    function cloudRequest(action, data = {}) {
+      return new Promise((resolve, reject) => {
+        if (!GOOGLE_API_URL || GOOGLE_API_URL.includes('請貼上')) return reject(new Error('尚未設定 Google Apps Script URL'));
+        const callback = 'tqcb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+        const script = document.createElement('script');
+        const cleanup = () => { try { delete window[callback]; script.remove(); } catch(e){} };
+        const timer = setTimeout(() => { cleanup(); reject(new Error('Google 雲端連線逾時')); }, 12000);
+        window[callback] = (result) => { clearTimeout(timer); cleanup(); result && result.ok === false ? reject(new Error(result.error || '雲端操作失敗')) : resolve(result); };
+        const params = new URLSearchParams({action, callback});
+        if (Object.keys(data).length) params.set('data', encodeURIComponent(JSON.stringify(data)));
+        script.src = GOOGLE_API_URL + (GOOGLE_API_URL.includes('?') ? '&' : '?') + params.toString();
+        script.onerror = () => { clearTimeout(timer); cleanup(); reject(new Error('無法連線 Google 雲端')); };
+        document.head.appendChild(script);
+      });
+    }
+
+    async function loadCloudData() {
+      if (cloudLoading) return;
+      cloudLoading = true;
+      try {
+        const data = await cloudRequest('getData');
+        if (Array.isArray(data.orders)) {
+          const localOrders = JSON.parse(localStorage.getItem('tq_orders') || '[]');
+          if (data.orders.length === 0 && localOrders.length > 0) {
+            for (const o of localOrders) await cloudRequest('createOrder', o);
+            data.orders = localOrders;
+          }
+          localStorage.setItem('tq_orders', JSON.stringify(data.orders));
+        }
+        if (Array.isArray(data.trash)) localStorage.setItem('tq_trash', JSON.stringify(data.trash));
+        if (data.menuConfig) localStorage.setItem('tq_menu_config', JSON.stringify(data.menuConfig));
+        cloudReady = true;
+        renderAll();
+        renderProductAvailability();
+      } catch(e) { console.warn('Google 雲端同步：', e.message); }
+      finally { cloudLoading = false; }
+    }
+
+    let currentTab = 'todayPending';
+    let currentCalendarDate = new Date();
+    let notifications = JSON.parse(localStorage.getItem('tq_notifications')) || [];
+
+    // 初始化頁面
+    function initAdmin() {
+      checkTrashExpiration(); // 檢查回收站 7 天期限
+      initRevenueDates();
+      renderAll();
+      loadCloudData();
+      setInterval(loadCloudData, 5000);
+
+      // 跨分頁 Storage 監聽 (秒級同步)
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'tq_orders' || e.key === 'tq_trash' || e.key === 'tq_menu_config') {
+          syncDataFromStorage(e);
+        }
+      });
+
+      // 背景定時輪詢 (每 10 秒刷新)
+      setInterval(() => {
+        renderAll();
+      }, 10000);
+    }
+
+    function initRevenueDates() {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (!document.getElementById('revStartDate').value) {
+        document.getElementById('revStartDate').value = todayStr;
+      }
+      if (!document.getElementById('revEndDate').value) {
+        document.getElementById('revEndDate').value = todayStr;
+      }
+    }
+
+    function syncDataFromStorage(e) {
+      if (e.key === 'tq_orders' && e.newValue) {
+        const oldOrders = JSON.parse(e.oldValue || '[]');
+        const newOrders = JSON.parse(e.newValue);
+        if (newOrders.length > oldOrders.length) {
+          // 偵測到新訂單加入
+          const diffCount = newOrders.length - oldOrders.length;
+          addNotification(`收到 ${diffCount} 筆來自前台的新訂單！單號：${newOrders[0].id}`);
+        }
+      }
+      renderAll();
+    }
+
+    // 新增通知系統
+    function addNotification(text) {
+      const newNotif = {
+        id: Date.now(),
+        text: text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        unread: true
+      };
+      notifications.unshift(newNotif);
+      localStorage.setItem('tq_notifications', JSON.stringify(notifications));
+      updateNotificationUI();
+    }
+
+    function updateNotificationUI() {
+      const unreadCount = notifications.filter(n => n.unread).length;
+      const badge = document.getElementById('notifBadge');
+      if (unreadCount > 0) {
+        badge.innerText = unreadCount;
+        badge.style.display = 'flex';
+      } else {
+        badge.style.display = 'none';
+      }
+
+      const listContainer = document.getElementById('notifList');
+      if (notifications.length === 0) {
+        listContainer.innerHTML = '<div style="padding: 15px; text-align: center; color: #777; font-size: 0.85rem;">目前沒有新通知</div>';
+        return;
+      }
+
+      listContainer.innerHTML = notifications.map(n => `
+        <div class="notification-item ${n.unread ? 'unread' : ''}" onclick="markNotificationRead(${n.id})">
+          <div>${n.text}</div>
+          <div class="notification-time">${n.time}</div>
+        </div>
+      `).join('');
+    }
+
+    function toggleNotificationDropdown() {
+      const dropdown = document.getElementById('notifDropdown');
+      dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function markNotificationRead(id) {
+      notifications = notifications.map(n => n.id === id ? { ...n, unread: false } : n);
+      localStorage.setItem('tq_notifications', JSON.stringify(notifications));
+      updateNotificationUI();
+    }
+
+    function markAllNotificationsRead() {
+      notifications = notifications.map(n => ({ ...n, unread: false }));
+      localStorage.setItem('tq_notifications', JSON.stringify(notifications));
+      updateNotificationUI();
+    }
+
+    // 點擊畫面其他地方關閉通知選單
+    window.addEventListener('click', (e) => {
+      if (!e.target.closest('.bell-container')) {
+        document.getElementById('notifDropdown').style.display = 'none';
+      }
+    });
+
+    // 檢查垃圾桶 7 天自動清除機制
+    function checkTrashExpiration() {
+      let trash = JSON.parse(localStorage.getItem('tq_trash')) || [];
+      const now = new Date().getTime();
+      const validTrash = trash.filter(item => {
+        const deletedTime = new Date(item.deletedAt).getTime();
+        const daysPassed = (now - deletedTime) / (1000 * 60 * 60 * 24);
+        return daysPassed < 7; // 保留 7 天以內
+      });
+      localStorage.setItem('tq_trash', JSON.stringify(validTrash));
+    }
+
+    function switchTab(tabName) {
+      currentTab = tabName;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      const targetBtn = [...document.querySelectorAll('.tab-btn')].find(btn => btn.getAttribute('onclick')?.includes(`'${tabName}'`));
+      if (targetBtn) targetBtn.classList.add('active');
+
+      document.getElementById('orderTableContainer').style.display = (tabName === 'calendar') ? 'none' : 'block';
+      document.getElementById('calendarSection').style.display = (tabName === 'calendar') ? 'block' : 'none';
+      document.getElementById('filterBar').style.display = (tabName === 'calendar') ? 'none' : 'flex';
+      document.getElementById('archiveDateFilterContainer').style.display = (tabName === 'completed') ? 'flex' : 'none';
+
+      if (tabName === 'calendar') {
+        renderCalendar();
+      } else {
+        renderOrders();
+      }
+    }
+
+    function clearArchiveDateFilter() {
+      document.getElementById('archiveDateFilter').value = '';
+      renderOrders();
+    }
+
+    function renderAll() {
+      updateBadgesAndStats();
+      if (currentTab === 'calendar') {
+        renderCalendar();
+      } else {
+        renderOrders();
+      }
+      updateRevenue();
+      renderProductAvailability();
+      renderMiniCalendar();
+      updateNotificationUI();
+    }
+
+    function updateBadgesAndStats() {
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      let trash = JSON.parse(localStorage.getItem('tq_trash')) || [];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const todayPendingCount = orders.filter(o => o.status === '待處理' && o.pickupDate === todayStr).length;
+      const todayCompletedCount = orders.filter(o => o.status === '已完成' && o.pickupDate === todayStr).length;
+      const allPendingCount = orders.filter(o => o.status === '待處理').length;
+      const completedCount = orders.filter(o => o.status === '已完成').length;
+
+      // 更新統計卡片
+      document.getElementById('statTodayPending').innerText = `${todayPendingCount}`;
+      document.getElementById('statTodayCompleted').innerText = `${todayCompletedCount}`;
+      document.getElementById('statTotalOrders').innerText = `${orders.length}`;
+      document.getElementById('sideAllPending').innerText = allPendingCount;
+      document.getElementById('statPendingTop').innerText = `${allPendingCount} 筆`;
+      document.getElementById('statCompletedTop').innerText = `${completedCount} 筆`;
+
+      // 更新頁籤數量徽章
+      document.getElementById('badgeTodayPending').innerText = todayPendingCount;
+      document.getElementById('badgeAllPending').innerText = allPendingCount;
+      document.getElementById('badgeCompleted').innerText = completedCount;
+      document.getElementById('badgeTrash').innerText = trash.length;
+    }
+
+    function renderOrders() {
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      let trash = JSON.parse(localStorage.getItem('tq_trash')) || [];
+      const todayStr = new Date().toISOString().split('T')[0];
+      const keyword = document.getElementById('searchInput').value.toLowerCase();
+      const archiveDate = document.getElementById('archiveDateFilter').value;
+
+      let filtered = [];
+
+      if (currentTab === 'todayPending') {
+        filtered = orders.filter(o => o.status === '待處理' && o.pickupDate === todayStr);
+      } else if (currentTab === 'allPending') {
+        filtered = orders.filter(o => o.status === '待處理');
+      } else if (currentTab === 'completed') {
+        filtered = orders.filter(o => o.status === '已完成');
+        if (archiveDate) {
+          filtered = filtered.filter(o => o.pickupDate === archiveDate);
+        }
+      } else if (currentTab === 'trash') {
+        filtered = trash;
+      }
+
+      // 關鍵字搜尋過濾
+      if (keyword) {
+        filtered = filtered.filter(o => 
+          o.name.toLowerCase().includes(keyword) || 
+          o.phone.includes(keyword) || 
+          o.id.toLowerCase().includes(keyword)
+        );
+      }
+
+      const tbody = document.getElementById('orderTableBody');
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#777; padding:30px;">目前沒有相關訂單紀錄</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(o => {
+        let badgeHtml = '';
+        let actionButtons = '';
+
+        if (currentTab === 'trash') {
+          const deletedTime = new Date(o.deletedAt).getTime();
+          const daysLeft = Math.max(0, 7 - Math.floor((new Date().getTime() - deletedTime) / (1000 * 60 * 60 * 24)));
+          badgeHtml = `<span class="badge badge-trash">回收站 (剩 ${daysLeft} 天)</span>`;
+          actionButtons = `
+            <button class="btn btn-restore" onclick="restoreOrder('${o.id}')">🔄 復原</button>
+            <button class="btn btn-delete" onclick="permanentDelete('${o.id}')">❌ 永久刪除</button>
+          `;
+        } else {
+          if (o.status === '待處理') {
+            badgeHtml = `<span class="badge badge-pending">待處理</span>`;
+            actionButtons = `
+              <button class="btn btn-complete" onclick="updateStatus('${o.id}', '已完成')">✅ 完成</button>
+              <button class="btn btn-edit" onclick="openEditModal('${o.id}')">✏️ 編輯</button>
+              <button class="btn btn-delete" onclick="moveToTrash('${o.id}')">🗑️ 刪除</button>
+            `;
+          } else {
+            badgeHtml = `<span class="badge badge-completed">已完成/封存</span>`;
+            actionButtons = `
+              <button class="btn btn-restore" onclick="updateStatus('${o.id}', '待處理')">↩️ 改回待處理</button>
+              <button class="btn btn-edit" onclick="openEditModal('${o.id}')">✏️ 編輯</button>
+              <button class="btn btn-delete" onclick="moveToTrash('${o.id}')">🗑️ 刪除</button>
+            `;
+          }
+        }
+
+        return `
+          <tr>
+            <td style="font-weight:bold; color:var(--primary-color);">${o.id}</td>
+            <td><strong>${o.name}</strong><br><span style="font-size:0.8rem; color:#666;">${o.phone}</span></td>
+            <td><span style="font-weight:bold; color:#d9381e;">[${o.diningType}]</span> <span style="font-size:0.8rem; color:#555;">${o.address}</span><br><div style="white-space:pre-line; font-size:0.82rem; margin-top:2px;">${o.items}</div></td>
+            <td>${o.pickupDate}<br><span style="font-weight:bold; color:var(--accent-color);">${o.pickupTime}</span></td>
+            <td style="font-weight:bold;">$${o.total}</td>
+            <td>${badgeHtml}</td>
+            <td><div style="display:flex; gap:6px; flex-wrap:wrap;">${actionButtons}</div></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 訂單狀態變更
+    function updateStatus(orderId, newStatus) {
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      orders = orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
+      localStorage.setItem('tq_orders', JSON.stringify(orders));
+      const changed = orders.find(o=>o.id===orderId);
+      if (cloudReady && changed) cloudRequest('updateOrder', changed).catch(e=>alert('⚠️ 雲端同步失敗：'+e.message));
+      renderAll();
+    }
+
+    // 移至垃圾桶（記憶當時狀態）
+    function moveToTrash(orderId) {
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      let trash = JSON.parse(localStorage.getItem('tq_trash')) || [];
+
+      const targetOrder = orders.find(o => o.id === orderId);
+      if (!targetOrder) return;
+
+      targetOrder.deletedAt = new Date().toISOString(); // 記錄刪除時間計算 7 天
+      trash.unshift(targetOrder);
+      orders = orders.filter(o => o.id !== orderId);
+
+      localStorage.setItem('tq_orders', JSON.stringify(orders));
+      localStorage.setItem('tq_trash', JSON.stringify(trash));
+      if (cloudReady) cloudRequest('moveToTrash', {id: orderId}).catch(e=>alert('⚠️ 雲端同步失敗：'+e.message));
+      renderAll();
+      addNotification(`訂單 ${orderId} 已移至垃圾桶`);
+    }
+
+    // 完美復原訂單狀態
+    function restoreOrder(orderId) {
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      let trash = JSON.parse(localStorage.getItem('tq_trash')) || [];
+
+      const targetOrder = trash.find(o => o.id === orderId);
+      if (!targetOrder) return;
+
+      delete targetOrder.deletedAt; // 移除刪除標記
+      orders.unshift(targetOrder);
+      trash = trash.filter(o => o.id !== orderId);
+
+      localStorage.setItem('tq_orders', JSON.stringify(orders));
+      localStorage.setItem('tq_trash', JSON.stringify(trash));
+      if (cloudReady) cloudRequest('restoreOrder', {id: orderId}).catch(e=>alert('⚠️ 雲端同步失敗：'+e.message));
+      renderAll();
+      addNotification(`訂單 ${orderId} 已成功復原至原狀態 (${targetOrder.status})`);
+    }
+
+    function permanentDelete(orderId) {
+      if (!confirm('⚠️ 確定要永久刪除此訂單嗎？此動作無法復原！')) return;
+      let trash = JSON.parse(localStorage.getItem('tq_trash')) || [];
+      trash = trash.filter(o => o.id !== orderId);
+      localStorage.setItem('tq_trash', JSON.stringify(trash));
+      if (cloudReady) cloudRequest('permanentDelete', {id: orderId}).catch(e=>alert('⚠️ 雲端同步失敗：'+e.message));
+      renderAll();
+    }
+
+    // 編輯訂單功能
+    function openEditModal(orderId) {
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      document.getElementById('editOrderId').value = order.id;
+      document.getElementById('editName').value = order.name;
+      document.getElementById('editPhone').value = order.phone;
+      document.getElementById('editDate').value = order.pickupDate;
+      document.getElementById('editTime').value = order.pickupTime;
+      document.getElementById('editContent').value = order.items;
+      document.getElementById('editTotal').value = order.total;
+      document.getElementById('editNotes').value = order.notes || '';
+
+      document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').style.display = 'none';
+    }
+
+    function saveEditedOrder() {
+      const orderId = document.getElementById('editOrderId').value;
+      const name = document.getElementById('editName').value.trim();
+      const phone = document.getElementById('editPhone').value.trim();
+      const pickupDate = document.getElementById('editDate').value;
+      const pickupTime = document.getElementById('editTime').value;
+      const items = document.getElementById('editContent').value.trim();
+      const total = Number(document.getElementById('editTotal').value);
+      const notes = document.getElementById('editNotes').value.trim();
+
+      if (!name || phone.length !== 10 || !pickupDate || !pickupTime) {
+        return alert('⚠️ 請完整填寫且確保電話為 10 碼數字！');
+      }
+
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      orders = orders.map(o => {
+        if (o.id === orderId) {
+          return { ...o, name, phone, pickupDate, pickupTime, items, total, notes };
+        }
+        return o;
+      });
+
+      localStorage.setItem('tq_orders', JSON.stringify(orders));
+      const edited = orders.find(o=>o.id===orderId);
+      if (cloudReady && edited) cloudRequest('updateOrder', edited).catch(e=>alert('⚠️ 雲端同步失敗：'+e.message));
+      closeEditModal();
+      renderAll();
+      addNotification(`訂單 ${orderId} 內容已手動修改更新`);
+    }
+
+    // 商品「售完」同步管理
+    function getMenuConfig() {
+      const defaults = {
+        light: { title:'輕食餐盒', items:[] },
+        cooked: { title:'美味熟食', items:[] }
+      };
+      return JSON.parse(localStorage.getItem('tq_menu_config')) || defaults;
+    }
+
+    function saveSoldOut(cat, itemId, soldOut) {
+      const config = getMenuConfig();
+      if (!config[cat]) return;
+      const item = config[cat].items.find(i => i.id === itemId);
+      if (!item) return;
+      item.soldOut = soldOut;
+      localStorage.setItem('tq_menu_config', JSON.stringify(config));
+      if (cloudReady) cloudRequest('updateMenu', config).catch(e=>alert('⚠️ 雲端同步失敗：'+e.message));
+      renderProductAvailability();
+      addNotification(`${item.name} 已${soldOut ? '設定為售完' : '恢復供應'}`);
+    }
+
+    function renderProductAvailability() {
+      const config = getMenuConfig();
+      const box = document.getElementById('productAvailability');
+      let html = '';
+      ['light','cooked'].forEach(cat => {
+        (config[cat]?.items || []).forEach(item => {
+          html += `<div class="product-toggle">
+            <span>${item.name}</span>
+            <label class="sold-switch" title="${item.soldOut ? '售完' : '供應中'}">
+              <input type="checkbox" ${item.soldOut ? 'checked' : ''} onchange="saveSoldOut('${cat}','${item.id}',this.checked)">
+              <span class="sold-slider"></span>
+            </label>
+          </div>`;
+        });
+      });
+      box.innerHTML = html || '<div style="color:#777;font-size:.8rem;">尚無商品資料</div>';
+    }
+
+    // 自訂區間營收計算
+    function updateRevenue() {
+      const start = document.getElementById('revStartDate').value;
+      const end = document.getElementById('revEndDate').value;
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+
+      let revenue = 0;
+      orders.forEach(o => {
+        if (o.status === '已完成' && (!start || o.pickupDate >= start) && (!end || o.pickupDate <= end)) {
+          revenue += o.total;
+        }
+      });
+
+      document.getElementById('statRevenue').innerText = `$${revenue.toLocaleString()}`;
+      document.getElementById('statRevenueTop').innerText = `$${revenue.toLocaleString()}`;
+    }
+
+    function renderMiniCalendar() {
+      const year = currentCalendarDate.getFullYear(), month = currentCalendarDate.getMonth();
+      document.getElementById('miniCalendarTitle').innerText = `${year}/${month+1}`;
+      const grid = document.getElementById('miniCalendar');
+      const first = new Date(year,month,1).getDay();
+      const days = new Date(year,month+1,0).getDate();
+      const orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+      let html = '';
+      for(let i=0;i<first;i++) html += '<div></div>';
+      for(let d=1;d<=days;d++){
+        const ds=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayOrders=orders.filter(o=>o.pickupDate===ds);
+        const pending=dayOrders.some(o=>o.status==='待處理');
+        html += `<div class="day ${dayOrders.length?'has-order':''} ${pending?'has-pending':''}" onclick="jumpToDate('${ds}')" title="${dayOrders.length} 筆訂單">${d}</div>`;
+      }
+      grid.innerHTML=html;
+    }
+
+    function jumpToDate(dateString) {
+      document.getElementById('archiveDateFilter').value = dateString;
+      switchTab('completed');
+      renderOrders();
+    }
+
+    // 訂單日曆表（紅綠點邏輯）
+    function changeMonth(direction) {
+      currentCalendarDate.setMonth(currentCalendarDate.getMonth() + direction);
+      renderCalendar();
+      renderMiniCalendar();
+    }
+
+    function renderCalendar() {
+      const year = currentCalendarDate.getFullYear();
+      const month = currentCalendarDate.getMonth();
+      document.getElementById('calendarTitle').innerText = `${year}年 ${month + 1}月 訂單日曆表`;
+
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const totalDays = new Date(year, month + 1, 0).getDate();
+      let orders = JSON.parse(localStorage.getItem('tq_orders')) || [];
+
+      const grid = document.getElementById('calendarDaysGrid');
+      let html = '';
+
+      // 空白填補
+      for (let i = 0; i < firstDayIndex; i++) {
+        html += `<div class="calendar-cell" style="background:#f4f6f8; border:none;"></div>`;
+      }
+
+      for (let day = 1; day <= totalDays; day++) {
+        const monthStr = String(month + 1).padStart(2, '0');
+        const dayStr = String(day).padStart(2, '0');
+        const dateString = `${year}-${monthStr}-${dayStr}`;
+
+        const dayOrders = orders.filter(o => o.pickupDate === dateString);
+        const hasPending = dayOrders.some(o => o.status === '待處理');
+        const hasCompleted = dayOrders.some(o => o.status === '已完成');
+        const hasAny = dayOrders.length > 0;
+
+        let dotsHtml = '';
+        if (hasPending) dotsHtml += `<span class="dot dot-red" title="有待處理訂單"></span>`;
+        if (hasCompleted) dotsHtml += `<span class="dot dot-green" title="有已完成訂單"></span>`;
+
+        html += `
+          <div class="calendar-cell ${hasAny ? 'has-orders' : ''}">
+            <div class="calendar-date-num">${day}</div>
+            <div style="font-size:0.7rem; color:#555;">${dayOrders.length > 0 ? `${dayOrders.length} 筆訂單` : ''}</div>
+            <div class="dot-container">${dotsHtml}</div>
+          </div>
+        `;
+      }
+
+      grid.innerHTML = html;
+    }
+
+    // 啟動系統
+    initAdmin();
+  </script>
+</body>
+</html>
