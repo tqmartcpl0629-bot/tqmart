@@ -173,7 +173,7 @@
       });
     }
 
-    async function loadCloudData() {
+async function loadCloudData() {
       if (cloudLoading) return;
       cloudLoading = true;
       try {
@@ -181,15 +181,20 @@
         if (data.menuConfig && data.menuConfig.light && data.menuConfig.cooked) {
           menuConfig = data.menuConfig;
           localStorage.setItem('tq_menu_config', JSON.stringify(menuConfig));
+          
+          normalizeMenuConfig();
+          renderCategoryMenu('light', 'lightMenuContainer');
+          renderCategoryMenu('cooked', 'cookedMenuContainer');
         }
         if (Array.isArray(data.orders)) localStorage.setItem('tq_orders', JSON.stringify(data.orders));
         if (Array.isArray(data.trash)) localStorage.setItem('tq_trash', JSON.stringify(data.trash));
         cloudReady = true;
-        initPage();
+        
       } catch (e) {
         console.warn('Google 雲端尚未連線，使用本機資料：', e.message);
-        initPage();
-      } finally { cloudLoading = false; }
+      } finally { 
+        cloudLoading = false; 
+      }
     }
 
     const defaultMenuConfig = {
@@ -287,7 +292,7 @@
       }
     }
 
-  function initPage() {
+function initPage() {
       menuConfig = JSON.parse(localStorage.getItem('tq_menu_config')) || defaultMenuConfig;
       normalizeMenuConfig();
       document.getElementById('lightNotice').innerText = menuConfig.light.notice;
@@ -296,7 +301,7 @@
       renderCategoryMenu('light', 'lightMenuContainer');
       renderCategoryMenu('cooked', 'cookedMenuContainer');
       
-     
+      // 只有在「剛打開網頁且日期欄位是空的時候」才自動代入今天日期
       const pickupDateInput = document.getElementById('pickupDate');
       if (!pickupDateInput.value) {
         const now = new Date();
@@ -306,6 +311,7 @@
 
       refreshPickupTimeOptions();
       renderPickupTimeOptions();
+      
       window.addEventListener('storage', (e) => {
         if (e.key === 'tq_menu_config') {
           menuConfig = JSON.parse(e.newValue || JSON.stringify(defaultMenuConfig));
@@ -317,7 +323,6 @@
           renderPickupTimeOptions();
           updateSummary();
         }
-        if (e.key === 'tq_orders') { /* 訂單資料同步保留 */ }
       });
     }
     
